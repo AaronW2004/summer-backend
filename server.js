@@ -79,7 +79,7 @@ let graduates = [
     "major": "English",
     "awards": "Writing Award, Dean's List",
     "latinHonors": "Magna Cum Laude",
-    "img_name": "/images/graduate8.jpg"
+    "img_name": "../images/graduate8.jpg"
   }
 ];
 
