@@ -107,6 +107,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+app.options("/api/graduates", cors());
 
 app.post("/api/graduates", upload.single("image"), (req, res) => {
   const schema = Joi.object({
