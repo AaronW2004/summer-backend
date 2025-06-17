@@ -7,6 +7,9 @@ app.use(cors({
   origin: '*'
 }));
 
+const multer = require("multer");
+const path = require("path");
+
 const Joi = require('joi');
 
 let graduates = [
@@ -92,7 +95,20 @@ app.get("/api/graduates", (req, res) => {
     res.json(graduates);
 });
 
-app.post("/api/graduates", (req, res) => {
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "public/images"));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9) + ext;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage });
+
+app.post("/api/graduates", upload.single("image"), (req, res) => {
   const schema = Joi.object({
     name: Joi.string().min(3).required(),
     classification: Joi.string().required(),
@@ -110,7 +126,7 @@ app.post("/api/graduates", (req, res) => {
   const newGraduate = {
     _id: graduates.length + 1,
     ...value,
-    img_name: "/images/defaultgrad.jpg" 
+    img_name: req.file ? `/images/${req.file.filename}` : "/images/defaultgrad.jpg"
   };
 
   graduates.push(newGraduate);
