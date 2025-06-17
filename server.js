@@ -7,6 +7,7 @@ app.use(cors({
   origin: '*'
 }));
 
+const Joi = require('joi');
 
 let graduates = [
   {
@@ -91,18 +92,31 @@ app.get("/api/graduates", (req, res) => {
     res.json(graduates);
 });
 
-app.post("api/graduates", (req, res) => {
-  const graduate = {
-    name: req.body.name,
-    classification: req.body.classification,
-    major: req.body.major,
-    awards: req.body.awards,
-    latinHonors: req.body.latinHonors,
-    img_name: req.file.filename
+app.post("/api/graduates", (req, res) => {
+  const schema = Joi.object({
+    name: Joi.string().min(3).required(),
+    classification: Joi.string().required(),
+    major: Joi.string().required(),
+    awards: Joi.string().allow(''),
+    latinHonors: Joi.string().required()
+  });
+
+  const { error, value } = schema.validate(req.body);
+
+  if (error) {
+    return res.status(400).json({ success: false, message: error.details[0].message });
+  }
+
+  const newGraduate = {
+    _id: graduates.length + 1,
+    ...value,
+    img_name: "/images/defaultgrad.jpg" 
   };
-  graduates.push(graduate);
-  res.json(graduates);
+
+  graduates.push(newGraduate);
+  res.status(201).json(newGraduate);
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
