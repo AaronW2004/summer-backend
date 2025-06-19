@@ -8,6 +8,26 @@ app.use(cors({ origin: '*' }));
 const multer = require("multer");
 const path = require("path");
 const Joi = require('joi');
+const mongoose = require("mongoose");
+
+mongoose
+  .connect("mongodb+srv://aaronnw:aaronaaron@cluster0.ppamwfm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+  .then(() => console.log("Connected to mongodb"))
+  .catch((error) => console.log("Couldn't connect to mongodb", error));
+
+const graduateSchema = new mongoose.Schema({
+  name: String,
+  classification: String,
+  major: String,
+  awards: String,
+  latinHonors: String,
+  img_name: String, 
+});
+
+async function createMessage() {
+  const result = await message.save();
+  console.log(result);
+}
 
 let graduates = [
   {
@@ -84,18 +104,6 @@ let graduates = [
   }
 ];
 
-const validateGraduate = (data) => {
-  const schema = Joi.object({
-    name: Joi.string().min(3).required(),
-    classification: Joi.string().required(),
-    major: Joi.string().required(),
-    awards: Joi.string().allow(''),
-    latinHonors: Joi.string().required()
-  });
-
-  return schema.validate(data);
-};
-
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(__dirname, "public/images"));
@@ -113,48 +121,86 @@ app.get("/", (req, res)=> {
     res.sendFile(__dirname + "/index.html");
 });
 
-app.get("/api/graduates", (req, res) => {
-    res.json(graduates);
+const Graduate = mongoose.model("Graduate", graduateSchema);
+
+app.get("/api/graduates", async (req, res) => {
+    const graduates = await Graduate.find();
+    res.send(graduates);
 });
 
-app.post("/api/graduates", upload.single("image"), (req, res) => {
+app.get("/api/graduates/:id", async (req, res) => {
+    const graduate = await Graduate.findOne({_id: id });
+    res.send(graduate);
+});
+
+app.post("/api/graduates", upload.single("image"), async (req, res) => {
   const { error, value } = validateGraduate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
-
-  const newGraduate = {
-    _id: graduates.length + 1,
-    ...value,
-    img_name: req.file ? `/images/${req.file.filename}` : "/images/defaultgrad.jpg"
-  };
-
   graduates.push(newGraduate);
   res.status(200).send(newGraduate);
+
+  const graduate = new Graduate({
+    name: req.body.name,
+    classification: req.body.classification,
+    major: req.body.major,
+    awards: req.body.awards,
+    latinHonors: req.body.latinHonors,
+    img_name: req.file ? `/images/${req.file.filename}` : "/images/defaultgrad.jpg"
+  });
+
+  if (req.file) {
+  graduate.img_name = `/images/${req.file.filename}`;
+  }
+
+  const newGraduate = await graduate.save();
+  res.send(newGraduate);
 });
 
-app.put("/api/graduates/:id", upload.single("image"), (req, res) => {
-  let graduate = graduates.find((g) => g._id === parseInt(req.params.id));
-  if (!graduate) return res.status(404).send("Graduate not found");
+app.put("/api/graduates/:id", upload.single("image"), async (req, res) => {
+  const result = validateGraduate(req.body);
 
   const { error, value } = validateGraduate(req.body);
   if (error) return res.status(400).send(error.details[0].message);
 
-  Object.assign(graduate, value);
+  let fieldsToUpdate = {
+    name: req.body.name,
+    classification: req.body.classification,
+    major: req.body.major,
+    awards: req.body.awards,
+    latinHonors: req.body.latinHonors,
+  };
+
   if (req.file) {
-    graduate.img_name = `/images/${req.file.filename}`;
+    fieldsToUpdate.img_name = `/images/${req.file.filename}`;
   }
 
+  const wentThrough = await Graduate.updateOne(
+    { _id: req.params.id },
+    fieldsToUpdate
+  );
+
+  const updatedGraduate = await Graduate.findOne({ _id: req.params.id });
+  res.send(updatedGraduate);
+  });
+
+  app.delete("/api/graduates/:id", async (req, res) => {
+  const graduate = await Graduate.findByIdAndDelete(req.params.id);
   res.send(graduate);
-});
+  });
 
-app.delete("/api/graduates/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = graduates.findIndex((g) => g._id === id);
+  const validateGraduate = (graduate) => {
+    const schema = Joi.object({
+      _id: Joi.allow(""),
+      name: Joi.string().min(3).required(),
+      classification: Joi.string().required(),
+      major: Joi.string().required(),
+      awards: Joi.string().required(),
+      latinHonors: Joi.string().required(),
+      img_name: Joi.string().required(),
+    });
 
-  if (index === -1) return res.status(404).send("Graduate not found");
-
-  const deleted = graduates.splice(index, 1);
-  res.status(200).send(deleted[0]);
-});
+  return schema.validate(graduate);
+};
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
